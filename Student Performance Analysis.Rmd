@@ -1,0 +1,332 @@
+---
+title: "Student Performance analysis"
+author: "Preeti Agrawal"
+date: "2025-01-09"
+output: html_document
+---
+
+# **Introduction**
+
+Stellenbosch University conducted a comprehensive survey aimed at assessing the factors influencing student performance, with a particular emphasis on the role of alcohol consumption. The survey encompassed various variables, including:
+
+Dependent Variable:  
+
+Student AVG Grade(2023 Grade(%): Average the student achieved in 2023 in percentage. (Numerical, continuous). 0-100
+
+Independent Variables:  
+
+Sex: The gender of the students (categorical: Male/Female)
+
+Matric Grade %: The students grade average in 12th grade (Numerical, continuous: 0-100)
+
+Faculty: The faculty under which the student’s degree falls at Stellenbosch university. (categorical: Agrisciences, Art & social sciences, ETC..)
+
+Scholarship: Is the student on scholarship (Categorical: Yes or No)
+
+Study Hours: The amount of time a student spends studying over and above their weekly lectures. (Numerical, discrete: 0-3, 4-8,8+)
+
+Alcohol Consumption:  Whether the student is a heavy drinker or not
+
+Weeknight Partying: How often the student goes out on weeknights. (Numerical, discrete: 0,1,2,3,4)
+
+Relationship: Is the student in a romantic relationship or not (Categorical: Yes/No)
+
+Year: Which Year is the Student's Grade 
+
+Relationship with Parent: How close the student’s relationship is with their parents. (Categorical: Very close, close, fair, distant). 
+
+# 1. Loading and Preprocessing
+
+```{r warning=FALSE}
+# Load required libraries
+library(tidyverse)
+library(car) # For ANOVA
+library(ggpubr) # For normality tests
+
+# Load the dataset
+data <- readxl::read_excel("Student_survey data.xlsx")
+
+summary(data)
+
+# Convert categorical variables to factors
+data$Gender <- as.factor(data$Gender)
+data$Scholarship <- as.factor(data$Scholarship)
+data$Faculty <- as.factor(data$Faculty)
+data$AlcoholC <- as.factor(data$AlcoholC)
+data$RomanticRelatnship <- as.factor(data$RomanticRelatnship)
+data$ParentRelationship <- as.factor(data$ParentRelationship)
+data$Year <- as.factor(data$Year)
+```
+
+# 2. Exploratory Data Analysis
+
+###  Continuous Variables
+
+```{r}
+# Summary statistics for continuous variables
+summary(data$MatricGrade)
+summary(data$Grade2023)
+
+# Histograms for continuous variables
+hist(data$MatricGrade, main = "Histogram of Matric Grades", xlab = "Matric Grades", col = "blue", border = "black")
+hist(data$Grade2023, main = "Histogram of 2023 Grades", xlab = "2023 Grades", col = "green", border = "black")
+
+# Test normality of Grade2023
+shapiro.test(data$Grade2023)
+
+# Normal probability plot
+qqnorm(data$Grade2023, main = "Normal Q-Q Plot of Grade2023")
+qqline(data$Grade2023, col = "red")
+
+```
+
+Metric Grade has a normal distribution
+
+2023 Grade has a slightly normal distribution. We will explore some transformation and identify the best approach.
+
+###  Transformations and Histograms
+
+```{r}
+
+# Log10 Transformation
+log10_grade <- log10(data$Grade2023 + 1) # Add 1 to avoid log(0)
+hist(log10_grade, main = "Log10 Transformation of Grade2023", xlab = "Log10(Grade2023)", col = "purple", border = "black")
+
+# Square Root Transformation
+sqrt_grade <- sqrt(data$Grade2023)
+hist(sqrt_grade, main = "Square Root Transformation of Grade2023", xlab = "Sqrt(Grade2023)", col = "orange", border = "black")
+
+# Natural Log Transformation
+log_grade <- log(data$Grade2023 + 1) # Add 1 to avoid log(0)
+hist(log_grade, main = "Natural Log Transformation of Grade2023", xlab = "Log(Grade2023)", col = "pink", border = "black")
+
+```
+
+The untransformed data displays a distribution that more closely aligns with a normal distribution when contrasted with the transformed dataset. Hence, we will opt to utilize the original data for our analysis
+
+### Categorical Variable
+
+```{r}
+# Boxplots for categorical variables
+boxplot(Grade2023 ~ Gender, data = data, main = "Grades by Gender")
+boxplot(Grade2023 ~ AlcoholC, data = data, main = "Grades by Alcohol Consumption")
+boxplot(Grade2023 ~ Gender, data = data, main = "Grades by Gender")
+boxplot(Grade2023 ~ ParentRelationship, data = data, main = "Grades by Relationship with Parent")
+boxplot(Grade2023 ~ RomanticRelatnship, data = data, main = "Grades by Relationship Status")
+boxplot(Grade2023 ~ Scholarship, data = data, main = "Grades by Scholarship")
+boxplot(Grade2023 ~ StudyHours, data = data, main = "Grades by Study Frequency")
+```
+
+• **Degree Programs:** Varied median grades are observed across different programs; for instance, Medicine tends to exhibit higher median grades compared to Law.
+
+• **Alcohol Consumption:** Students who are non-heavy drinkers tend to achieve a slightly higher median grade.
+
+• **Gender:** Females tend to have a slightly higher median grade compared to males.
+
+• **Relationship with Parents:** No discernible pattern in median grades based on the relationship with parents.
+
+• **Romantic Relationship:** Single students tend to achieve a slightly higher median grade compared to those in a romantic relationship.
+
+• **Scholarships:** There appears to be no significant difference in median grades between students with scholarships and those without.
+
+• **Hours Studying:** Increased hours of studying appear to correlate positively with higher median grades.
+
+```{r}
+# Correlation of continuous variables
+correlation_matrix <- cor(data %>% select_if(is.numeric), use = "complete.obs")
+print(correlation_matrix)
+
+# Visualize the correlation matrix
+library(corrplot)
+if (!require(corrplot)) install.packages("corrplot")
+library(corrplot)
+corrplot(correlation_matrix, method = "circle", main = "Correlation Matrix of Continuous Variables")
+
+```
+
+There is evidence indicating that matriculation grades has a moderately positive relationship with current school year grades, with this relationship being statistically significant. Nonetheless, the dispersion of data points implies the presence of additional factors influencing current school year grades
+
+# 3. Inferential Study
+
+```{r}
+# ANOVA Tests for Various Factors
+# Gender
+anova_gender <- aov(Grade2023 ~ Gender, data = data)
+summary(anova_gender)
+
+# Year
+anova_year <- aov(Grade2023 ~ Year, data = data)
+summary(anova_year)
+
+# Alcohol Consumption
+anova_alcohol <- aov(Grade2023 ~ AlcoholC, data = data)
+summary(anova_alcohol)
+
+# Degree Program
+anova_degree <- aov(Grade2023 ~ Faculty, data = data)
+summary(anova_degree)
+
+# Scholarship
+anova_scholarship <- aov(Grade2023 ~ Scholarship, data = data)
+summary(anova_scholarship)
+
+# Relationship Status
+anova_relationship <- aov(Grade2023 ~ RomanticRelatnship, data = data)
+summary(anova_relationship)
+
+# Relationship with Parents
+anova_parent <- aov(Grade2023 ~ ParentRelationship, data = data)
+summary(anova_parent)
+
+# Faculty
+anova_faculty <- aov(Grade2023 ~ Faculty, data = data)
+summary(anova_faculty)
+```
+
+**Gender and Grade 2023:** The Levene's test shows we can reject the null hypothesis that the variances are equal. The p-value of **.**00801tells us that there is a ***significant difference*** in the mean grade between genders.
+
+**Year In School:** The Levene's test shows we can reject the null hypothesis that the variances are equal. The p-value of .297 tells us that there is ***not a significant difference*** in the mean grade between years.
+
+**Alcohol Consumption:** The Levene's test shows we can reject the null hypothesis that the variances are equal. The p-value of .0228 tells us that there is ***a significant difference*** in the mean grade for heavy and non-heavy drinkers
+
+**Degree Program​:** The Levene's test shows we can reject the null hypothesis that the variances are equal. The p-value of .532 tells us that there is ***not a significant difference*** in the mean grade for each degree program.
+
+**Scholarship**: The Levene's test shows we can reject the null hypothesis that the variances are equal. The p-value of .723 tells us that there is **not a significant difference** in the mean grade between scholarship and non-scholarship.
+
+**Relationship Status​:** The Levene's test shows we can reject the null hypothesis that the variances are equal. The p-value of .674 tells us that there is ***not a significant difference*** in the mean grade between relationship statuses.
+
+**Relationship With parents​:** The Levene's test shows we can reject the null hypothesis that the variances are equal. The p-value of .00575 tells us that ***there is a significant difference*** in the mean grade depending on how close a student is with their parents.
+
+**Faculty:**The Levene's test shows we can reject the null hypothesis that the variances are equal. The p-value of .532 tells us that ***there is no significant difference*** in the mean grade depending on different faculty.
+
+## Investigating Interactions
+
+```{r}
+# Plot interactions between MatricGrade and Grade2023 by categorical variables
+library(ggplot2)
+
+# Alcohol Consumption
+interaction_alcohol <- ggplot(data, aes(x = MatricGrade, y = Grade2023, color = AlcoholC)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(title = "Matriculation Grade vs. 2023 Grade by Alcohol Consumption",
+       x = "Matriculation Grade",
+       y = "2023 Grade",
+       color = "Alcohol Consumption") +
+  theme_minimal()
+
+# Scholarship
+interaction_scholarship <- ggplot(data, aes(x = MatricGrade, y = Grade2023, color = Scholarship)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(title = "Matriculation Grade vs. 2023 Grade by Scholarship",
+       x = "Matriculation Grade",
+       y = "2023 Grade",
+       color = "Scholarship") +
+  theme_minimal()
+
+# Year in School
+interaction_year <- ggplot(data, aes(x = MatricGrade, y = Grade2023, color = Year)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(title = "Matriculation Grade vs. 2023 Grade by Year in School",
+       x = "Matriculation Grade",
+       y = "2023 Grade",
+       color = "Year in School") +
+  theme_minimal()
+
+# Gender
+interaction_gender <- ggplot(data, aes(x = MatricGrade, y = Grade2023, color = Gender)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(title = "Matriculation Grade vs. 2023 Grade by Gender",
+       x = "Matriculation Grade",
+       y = "2023 Grade",
+       color = "Gender") +
+  theme_minimal()
+
+# Display the plots
+print(interaction_alcohol)
+print(interaction_scholarship)
+print(interaction_year)
+print(interaction_gender)
+```
+
+The Interactions are worth considering for multi-linear regression
+
+### Multilinear Regression without interactions 
+
+```{r}
+# Multiple Linear Regression - Model 1
+# Variables: MatricGrade, Gender, AlcoholC, Scholarship
+model1 <- lm(Grade2023 ~ MatricGrade + Gender + AlcoholC + Scholarship, data = data)
+summary(model1)
+
+# Multiple Linear Regression - Model 2
+# Variables: MatricGrade, Gender, ParentRelationship, StudyHours
+model2 <- lm(Grade2023 ~ MatricGrade + Gender + ParentRelationship + StudyHours, data = data)
+summary(model2)
+
+# Multiple Linear Regression - Model 3
+# Variables: MatricGrade, Year, AlcoholC, RomanticRelatnship
+model3 <- lm(Grade2023 ~ MatricGrade + Year + AlcoholC + RomanticRelatnship, data = data)
+summary(model3)
+
+# Multiple Linear Regression - Model 4
+# Variables: MatricGrade, Gender, Faculty, ParentRelationship, StudyHours
+model4 <- lm(Grade2023 ~ MatricGrade + Gender + Faculty + ParentRelationship + StudyHours, data = data)
+summary(model4)
+
+# Display significant variables for each model
+cat("Model 1 Significant Variables:")
+print(summary(model1)$coefficients[summary(model1)$coefficients[,4] < 0.05, ])
+
+cat("Model 2 Significant Variables:")
+print(summary(model2)$coefficients[summary(model2)$coefficients[,4] < 0.05, ])
+
+cat("Model 3 Significant Variables:")
+print(summary(model3)$coefficients[summary(model3)$coefficients[,4] < 0.05, ])
+
+cat("Model 4 Significant Variables:")
+print(summary(model4)$coefficients[summary(model4)$coefficients[,4] < 0.05, ])
+
+```
+
+### MultiLinear Regression with Interaction
+
+```{r}
+model5 <- lm(Grade2023 ~ MatricGrade + AlcoholC + Gender + Classmissed + ParentRelationship + Year + MatricGrade:AlcoholC, data = data)
+
+# Display the summary of the regression model
+summary(model5)
+```
+
+Since we get the highest Adjusted R2 in model 5, we will use it for final interpretations
+
+  There is a significant positive relationship between a student's matriculation grade and their college grade
+
+  On average heavy drinkers have significantly higher grades than non-heavy drinkers
+
+  On average females have significantly higher grades than males
+
+  There is a significant negative relationship between how many classes a student misses from drinking in a week and their grade
+
+  There is a significant positive relationship between how many weeknights a student goes out on and their grade, but only at the 90% level
+
+  On average students who have a distant relationship have significantly higher grades than students who have a "Close", "Very Close", or "Fair" relationship with their parents
+
+  On average 2nd year students have higher grades than the baseline of 1st year students
+
+  There is no significant difference for the grades of 3rd year, 4th or postgraduate students compared to the baseline of 1st year students
+
+  Non heavy drinkers' matriculation grades have significantly higher positive association than matriculation grades for heavy drinkers
+
+# Findings and Conclusion
+
+The project revealed several key factors that affect how well students perform academically. It found that ***gender plays a significant role, with female students generally doing better than male students***, possibly due to differences in how they engage with their studies or manage their time. Additionally, ***students who had good grades in the past were less affected by alcohol use, suggesting they might have stronger study skills or habits that help them cope better***.
+
+While the year in school and whether a student had a scholarship didn't directly impact their grades, these factors could still be influential when combined with other aspects of their academic and personal lives. This suggests that the situation surrounding a student’s studies can change how different factors affect their grades.
+
+Interestingly, ***the factors examined in the analysis explain about 19% of the variation in student grades, pointing out that other, yet unidentified factors also contribute significantly to academic success.***
+
+Overall, the study shows that many different characteristics and choices can influence student success. This is important for university policy makers to understand so they can create better support systems and programs, especially focusing on reducing the impact of alcohol and addressing gender differences in academic performance. These efforts could make a big difference in helping all students do their best.
